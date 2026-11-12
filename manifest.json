@@ -1,0 +1,55 @@
+{
+  "name": "TaskMaster Calendar Pro",
+  "short_name": "TaskMaster Pro",
+  "description": "Agenda inteligente, diario personal, gestión de tareas con voz y notificaciones multi-dispositivo.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "id": "com.medbasha.taskmasterpro",
+  "categories": ["productivity", "utilities", "lifestyle"],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nueva Tarea",
+      "short_name": "Tarea",
+      "description": "Añadir tarea rápida",
+      "url": "./index.html?action=add_task",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Diario & Mood",
+      "short_name": "Diario",
+      "description": "Escribir en el diario de hoy",
+      "url": "./index.html?action=journal",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
