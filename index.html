@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e1b18">
+    <title>TaskMaster Calendar Pro_v 3.7.0</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/svg+xml" href="./icon.svg">
+    <link rel="apple-touch-icon" href="./icon-152.png">
+
+    <!-- Leaflet & Dexie (Estándar cacheado en Service Worker) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+
+    <!-- Firebase SDK v10 Compat (App, Auth, Realtime Database, Messaging) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #181512;
+            --bg-card: #24201c;
+            --bg-input: #2f2a24;
+            --text-main: #f5f0eb;
+            --text-muted: #a69c92;
+            --accent: #d9823b;
+            --accent-hover: #bf6d2b;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --color-low: #6bb05d;
+            --color-medium: #e5934a;
+            --color-high: #e54d42;
+            --color-trabajo: #38bdf8;
+            --color-salud: #4ade80;
+            --color-finanzas: #fbbf24;
+            --color-personal: #c084fc;
+            --color-note: #f59e0b;
+        }
+
+        body.theme-gris {
+            --bg-main: #18191b;
+            --bg-card: #232529;
+            --bg-input: #2e3136;
+            --text-main: #f1f3f5;
+            --text-muted: #9aa0a6;
+            --accent: #60a5fa;
+        }
+
+        body.theme-marino {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+        }
+
+        body.theme-menta {
+            --bg-main: #0f1f1a;
+            --bg-card: #172e27;
+            --bg-input: #213f36;
+            --text-main: #ecfdf5;
+            --text-muted: #86efac;
+            --accent: #34d399;
+        }
+
+        body.theme-cream {
+            --bg-main: #f6f3ee;
+            --bg-card: #ffffff;
+            --bg-input: #ede8e0;
+            --text-main: #292524;
+            --text-muted: #78716c;
+            --accent: #d97706;
+            --border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        body.glass-active .card,
+        body.glass-active .dash-card,
+        body.glass-active .event-card,
+        body.glass-active .todo-item {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background: rgba(36, 32, 28, 0.72);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-bottom: 84px;
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
+
+        /* CABECERA SUPERIOR */
+        .app-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-brand h1 {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .icon-btn {
+            background: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 7px 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.96);
+        }
+
+        .cloud-pill {
+            font-size: 0.75rem;
+            padding: 6px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--accent);
+            background: rgba(217, 130, 59, 0.14);
+            color: var(--text-main);
+            cursor: pointer;
+            max-width: 130px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* BANNER DE PERMISOS */
+        #permission-banner {
+            display: none;
+            background: linear-gradient(90deg, #b45309, #d97706);
+            color: #fff;
+            padding: 10px 16px;
+            font-size: 0.84rem;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* PANTALLAS */
+        .screen {
+            display: none;
+            padding: 14px 16px;
+            max-width: 680px;
+            margin: 0 auto;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+        }
+
+        .section-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* BUSCADOR GLOBAL */
+        .search-bar-wrap {
+            position: relative;
+            margin-bottom: 12px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        /* PERFILES & DASHBOARD */
+        .profile-chips-row {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+            scrollbar-width: none;
+        }
+
+        .profile-chips-row::-webkit-scrollbar { display: none; }
+
+        .profile-chip {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 7px 13px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .profile-chip.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .dash-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .dash-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 12px;
+            cursor: pointer;
+        }
+
+        .dash-card-header {
+            font-weight: 700;
+            font-size: 0.88rem;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dash-warning-badge {
+            display: inline-block;
+            font-size: 0.72rem;
+            background: rgba(229, 77, 66, 0.16);
+            color: #fca5a5;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .dash-empty-badge {
+            display: inline-block;
+            font-size: 0.72rem;
+            background: rgba(107, 176, 93, 0.16);
+            color: #86efac;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .dash-info-line {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* CALENDARIO */
+        .cal-header-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            text-align: center;
+        }
+
+        .calendar-day-name {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            padding: 4px 0;
+        }
+
+        .calendar-cell {
+            background: var(--bg-input);
+            border-radius: 10px;
+            padding: 8px 2px 6px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            min-height: 44px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .calendar-cell.empty {
+            background: transparent;
+            cursor: default;
+        }
+
+        .calendar-cell.today {
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            font-weight: 800;
+        }
+
+        .note-dot-hint {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--color-note);
+        }
+
+        .indicator-bar-container {
+            display: flex;
+            gap: 2px;
+            width: 80%;
+            justify-content: center;
+            margin-top: 3px;
+        }
+
+        .ind-bar {
+            height: 3px;
+            flex: 1;
+            border-radius: 2px;
+        }
+
+        /* BARRA SEMANAL */
+        .week-bar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .week-day-chip {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px 4px;
+            text-align: center;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .week-day-chip.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .week-day-chip.today-highlight:not(.active) {
+            border-color: var(--accent);
+        }
+
+        .week-day-chip .day-name { font-size: 0.72rem; opacity: 0.8; }
+        .week-day-chip .day-num { font-size: 0.92rem; font-weight: 800; }
+
+        /* TAREAS Y EVENTOS */
+        .category-filter-row {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            margin-bottom: 10px;
+            padding-bottom: 4px;
+        }
+
+        .category-chip {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 5px 11px;
+            border-radius: 16px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .category-chip.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-input);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 6px 0 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--color-low);
+            transition: width 0.3s ease;
+        }
+
+        .todo-item, .event-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+
+        .todo-item.done .todo-text-span,
+        .event-card.done .event-title-txt {
+            text-decoration: line-through;
+            opacity: 0.55;
+        }
+
+        .todo-main-row, .event-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .todo-checkbox {
+            width: 19px;
+            height: 19px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .todo-text-span {
+            flex: 1;
+            font-size: 0.9rem;
+            line-height: 1.35;
+        }
+
+        .event-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .event-info {
+            flex: 1;
+        }
+
+        .event-time {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .event-title-txt {
+            font-weight: 700;
+            font-size: 0.92rem;
+            margin-top: 2px;
+        }
+
+        .event-desc-txt {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .btn-reminder {
+            background: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .event-del {
+            background: transparent;
+            border: none;
+            color: #f87171;
+            font-size: 1rem;
+            padding: 4px 6px;
+            cursor: pointer;
+        }
+
+        .subtasks-container {
+            margin-top: 8px;
+            padding-left: 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .subtask-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .subtask-item.done span {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        /* NOTAS */
+        .notes-editor {
+            min-height: 180px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 0.94rem;
+            line-height: 1.5;
+            outline: none;
+            color: var(--text-main);
+        }
+
+        .note-strike-txt {
+            text-decoration: line-through;
+            opacity: 0.65;
+        }
+
+        .notes-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        /* FORMULARIOS Y BOTONES */
+        .form-group {
+            margin-bottom: 11px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .form-control {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-primary:active {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-google {
+            width: 100%;
+            background: #ffffff;
+            color: #1f2937;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            padding: 11px 14px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .priority-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .priority-chip {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            border-radius: 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .priority-chip.selected {
+            border-color: var(--accent);
+            background: rgba(217, 130, 59, 0.2);
+        }
+
+        /* MODALES */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            z-index: 9000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 18px;
+            width: 100%;
+            max-width: 440px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .mood-btn {
+            background: var(--bg-input);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 10px 4px;
+            font-size: 1.4rem;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .mood-btn.selected {
+            border-color: var(--accent);
+            background: rgba(217, 130, 59, 0.2);
+        }
+
+        /* BARRA DE NAVEGACIÓN INFERIOR */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 4px 10px;
+            z-index: 200;
+        }
+
+        .nav-item {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+        }
+
+        .nav-icon {
+            font-size: 1.2rem;
+        }
+
+        /* BOTÓN FLOTANTE (+) */
+        #fab-main-btn {
+            display: none;
+            position: fixed;
+            bottom: 76px;
+            right: 18px;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            font-size: 1.7rem;
+            font-weight: 700;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+            cursor: pointer;
+            z-index: 250;
+        }
+
+        /* SELLO OFICIAL DISIMULADO MEDBASHA */
+        .medbasha-stamp {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            opacity: 0.42;
+            font-size: 0.72rem;
+            letter-spacing: 0.6px;
+            margin: 18px 0 6px;
+            color: var(--text-muted);
+            user-select: none;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .theme-card-btn {
+            background: var(--bg-input);
+            border: 2px solid transparent;
+            color: var(--text-main);
+            border-radius: 10px;
+            padding: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .theme-card-btn.active {
+            border-color: var(--accent);
+        }
+    </style>
+</head>
+<body class="theme-cafe">
+
+    <!-- CABECERA SUPERIOR -->
+    <header class="app-header">
+        <div class="header-brand">
+            <img src="./icon.svg" alt="TaskMaster" width="26" height="26">
+            <h1>TaskMaster Pro</h1>
+        </div>
+        <div class="header-actions">
+            <button id="btn-cloud-account-pill" class="cloud-pill" onclick="openAuthModal()" title="Cuenta y Auto-Recuperación en la Nube">
+                ☁️ Sincronizar
+            </button>
+            <button id="btn-global-mic" class="icon-btn" onclick="toggleGlobalVoiceAssistant()" title="Asistente de Voz IA">🎙️</button>
+            <button class="icon-btn" onclick="openTutorialModal(0)" title="Ayuda y Tutorial">?</button>
+            <button class="icon-btn" onclick="openSettingsScreen()" title="Ajustes">⚙️</button>
+        </div>
+    </header>
+
+    <!-- BANNER DE NOTIFICACIONES -->
+    <div id="permission-banner" onclick="requestPermissions()">
+        🔔 Toca aquí para activar las alertas sonoras y avisos en segundo plano
+    </div>
+
+    <!-- PANTALLA DE BIENVENIDA / SELECCIÓN DE PERFIL INICIAL -->
+    <section id="screen-welcome" class="screen">
+        <div class="card" style="text-align:center; padding: 24px 16px;">
+            <div style="font-size: 2.6rem; margin-bottom: 8px;">📅✨</div>
+            <h2 style="margin-bottom: 6px;">Bienvenido a TaskMaster Pro</h2>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 18px;">
+                Elige tu enfoque principal para adaptar la agenda, o inicia sesión con tu correo/Google para restaurar tus datos anteriores.
+            </p>
+
+            <button class="btn-google" onclick="loginWithGoogle()">
+                <span>🔵</span> Continuar con Google (Restaurar Nube)
+            </button>
+            <button class="btn-secondary" style="width:100%; margin-bottom:18px;" onclick="openAuthModal()">
+                ✉️ Entrar o registrarse con Correo Electrónico
+            </button>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; text-align:left;">
+                <button class="dash-card" onclick="selectUserProfile('trabajo')">
+                    <div class="dash-card-header">💼 Trabajo</div>
+                    <div class="dash-info-line">Proyectos, entregas y oficina</div>
+                </button>
+                <button class="dash-card" onclick="selectUserProfile('personal')">
+                    <div class="dash-card-header">🏠 Personal</div>
+                    <div class="dash-info-line">Hogar, familia y recados</div>
+                </button>
+                <button class="dash-card" onclick="selectUserProfile('salud')">
+                    <div class="dash-card-header">💪 Salud</div>
+                    <div class="dash-info-line">Citas médicas y hábitos</div>
+                </button>
+                <button class="dash-card" onclick="selectUserProfile('finanzas')">
+                    <div class="dash-card-header">💰 Finanzas</div>
+                    <div class="dash-info-line">Recibos, pagos y ahorro</div>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- PESTAÑA 1: INICIO (DASHBOARD) -->
+    <section id="tab-dashboard" class="screen active">
+        <div class="search-bar-wrap">
+            <input type="text" id="globalSearchInput" class="search-input" placeholder="Buscar tarea, evento o nota..." oninput="handleGlobalSearch(this.value)">
+        </div>
+
+        <div id="search-results-box" class="card" style="display:none;">
+            <div class="section-title">
+                <span>🔍 Resultados de búsqueda</span>
+                <button class="event-del" onclick="document.getElementById('search-results-box').style.display='none'">✕</button>
+            </div>
+            <div id="search-results-list"></div>
+        </div>
+
+        <div class="profile-chips-row">
+            <button class="profile-chip active" onclick="selectProfileDashboard('general', this)">🌟 General</button>
+            <button class="profile-chip" onclick="selectProfileDashboard('trabajo', this)">💼 Trabajo</button>
+            <button class="profile-chip" onclick="selectProfileDashboard('salud', this)">💪 Salud</button>
+            <button class="profile-chip" onclick="selectProfileDashboard('finanzas', this)">💰 Finanzas</button>
+            <button class="profile-chip" onclick="selectProfileDashboard('personal', this)">🏠 Personal</button>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div id="dash-profile-title" style="font-weight:800; font-size:0.96rem;">Perfil Activo: General / Personal</div>
+                    <div id="dash-profile-sub" style="font-size:0.8rem; color:var(--text-muted);">Vista unificada de tu jornada</div>
+                </div>
+                <button class="btn-secondary" onclick="openWishlistModal()">🛒 Compras</button>
+            </div>
+        </div>
+
+        <div class="dash-grid">
+            <div id="dash-card-trabajo" class="dash-card" onclick="switchTab('tasks')">
+                <div class="dash-card-header">💼 Trabajo</div>
+                <div class="dash-card-summary"></div>
+            </div>
+            <div id="dash-card-salud" class="dash-card" onclick="switchTab('tasks')">
+                <div class="dash-card-header">💪 Salud</div>
+                <div class="dash-card-summary"></div>
+            </div>
+            <div id="dash-card-finanzas" class="dash-card" onclick="switchTab('tasks')">
+                <div class="dash-card-header">💰 Finanzas</div>
+                <div class="dash-card-summary"></div>
+            </div>
+            <div id="dash-card-personal" class="dash-card" onclick="switchTab('tasks')">
+                <div class="dash-card-header">🏠 Personal</div>
+                <div class="dash-card-summary"></div>
+            </div>
+        </div>
+
+        <!-- TARJETA DIARIO & MOOD -->
+        <div class="card" onclick="openJournalModal()" style="cursor:pointer;">
+            <div class="section-title">
+                <span id="txt-journal-title">📖 Diario & Mood de Hoy</span>
+                <span id="txt-journal-edit" style="color:var(--accent); font-size:0.82rem;">Escribir ✍️</span>
+            </div>
+            <div id="dash-journal-summary" style="font-size:0.86rem; color:var(--text-muted);"></div>
+        </div>
+    </section>
+
+    <!-- PESTAÑA 2: CALENDARIO -->
+    <section id="tab-calendar" class="screen">
+        <div class="card">
+            <div class="cal-header-controls">
+                <button class="icon-btn" onclick="changeMonth(-1)">◀</button>
+                <strong id="calendar-month-year" style="font-size:1rem;">Mes Año</strong>
+                <div style="display:flex; gap:6px;">
+                    <button class="icon-btn" onclick="goToToday()">Hoy</button>
+                    <button class="icon-btn" onclick="changeMonth(1)">▶</button>
+                </div>
+            </div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <span>📅 Agenda del <span id="cal-selected-date-label">Hoy</span></span>
+                <button class="btn-secondary" onclick="openDayModalForSelectedDate()">+ Evento</button>
+            </div>
+            <div id="cal-selected-events-list"></div>
+        </div>
+    </section>
+
+    <!-- PESTAÑA 3: TAREAS -->
+    <section id="tab-tasks" class="screen">
+        <div id="week-bar" class="week-bar"></div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.84rem; font-weight:700;">Progreso del día</span>
+                <span id="progress-percent-txt" style="font-size:0.84rem; font-weight:800; color:var(--color-low);">0%</span>
+            </div>
+            <div class="progress-track">
+                <div id="progress-bar-fill" class="progress-fill"></div>
+            </div>
+
+            <div class="category-filter-row">
+                <button class="category-chip active" onclick="filterTaskCategory('all', this)">Todas</button>
+                <button class="category-chip" onclick="filterTaskCategory('personal', this)">🏠 Personal</button>
+                <button class="category-chip" onclick="filterTaskCategory('trabajo', this)">💼 Trabajo</button>
+                <button class="category-chip" onclick="filterTaskCategory('salud', this)">💪 Salud</button>
+                <button class="category-chip" onclick="filterTaskCategory('finanzas', this)">💰 Finanzas</button>
+                <button class="category-chip" onclick="filterTaskCategory('urgente', this)">🚨 Urgente</button>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <button class="btn-secondary" style="flex:1;" onclick="loadPresetTemplate()">⚡ Cargar Plantilla</button>
+                <button class="btn-secondary" style="flex:1;" onclick="shareDaySummary()">📤 Compartir Día</button>
+            </div>
+        </div>
+
+        <div id="tasks-day-list"></div>
+    </section>
+
+    <!-- PESTAÑA 4: NOTAS -->
+    <section id="tab-notes" class="screen">
+        <div class="card">
+            <div class="section-title">
+                <span>📝 Notas del <span id="notes-date-label">Día</span></span>
+                <button class="btn-secondary" onclick="openJournalModal()">📖 Diario/Mood</button>
+            </div>
+
+            <div class="notes-toolbar">
+                <button id="btn-dictate-notes" class="btn-secondary" onclick="toggleDictation()">🎙️ Dictar</button>
+                <button class="btn-secondary" onclick="formatNotesWithIA()">✨ Formatear</button>
+                <button class="btn-secondary" onclick="toggleStrikethroughNote()">S̶ Tachar</button>
+                <button class="btn-secondary" onclick="convertNoteToAlarm()">⏰ Crear Alarma</button>
+                <button class="btn-secondary" onclick="clearTabNotes()">🗑️ Limpiar</button>
+            </div>
+
+            <div id="tab-day-notes" class="notes-editor" contenteditable="true" oninput="saveTabNotes()" placeholder="Escribe o dicta tus notas aquí..."></div>
+        </div>
+    </section>
+
+    <!-- PESTAÑA 5: RESUMEN -->
+    <section id="tab-summary" class="screen">
+        <div class="card">
+            <div class="section-title">
+                <span>📊 Estadísticas de Hoy</span>
+                <span id="summary-profile-name" style="font-size:0.78rem; color:var(--accent);">General</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; text-align:center; margin-bottom:14px;">
+                <div style="background:var(--bg-input); padding:10px; border-radius:12px;">
+                    <div id="summary-pending-count" style="font-size:1.3rem; font-weight:800; color:#f87171;">0</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">Pendientes</div>
+                </div>
+                <div style="background:var(--bg-input); padding:10px; border-radius:12px;">
+                    <div id="summary-events-count" style="font-size:1.3rem; font-weight:800; color:#38bdf8;">0</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">Eventos</div>
+                </div>
+                <div style="background:var(--bg-input); padding:10px; border-radius:12px;">
+                    <div id="summary-locs-count" style="font-size:1.3rem; font-weight:800; color:#fbbf24;">0</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">Puntos GPS</div>
+                </div>
+            </div>
+
+            <canvas id="summaryCanvas" width="320" height="160" style="width:100%; max-width:340px; display:block; margin:0 auto;"></canvas>
+
+            <div id="ia-executive-summary-text" style="margin-top:12px; padding:10px; background:var(--bg-input); border-radius:10px; font-size:0.84rem;"></div>
+        </div>
+    </section>
+
+    <!-- PANTALLA NUEVO EVENTO DESDE CALENDARIO -->
+    <section id="screen-day-modal" class="screen">
+        <div class="card">
+            <div class="section-title">
+                <span>📅 Nuevo Evento: <span id="selected-date-title"></span> (<span id="selected-weekday"></span>)</span>
+                <button class="icon-btn" onclick="switchTab('calendar')">✕</button>
+            </div>
+
+            <div class="form-group">
+                <label>Título del evento</label>
+                <input type="text" id="eventTitle" class="form-control" placeholder="Ej. Cita médica / Reunión">
+            </div>
+
+            <div class="form-group">
+                <label>Hora de aviso</label>
+                <input type="time" id="eventTime" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label>Detalles adicionales</label>
+                <input type="text" id="eventDesc" class="form-control" placeholder="Notas opcionales del evento...">
+            </div>
+
+            <div class="form-group">
+                <label>Prioridad / Color</label>
+                <div class="priority-row">
+                    <div class="priority-chip selected" data-value="low" onclick="selectPriority(this)">🟢 Normal</div>
+                    <div class="priority-chip" data-value="medium" onclick="selectPriority(this)">🟠 Media</div>
+                    <div class="priority-chip" data-value="high" onclick="selectPriority(this)">🔴 Alta</div>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="saveEventFromCalModal()">Guardar Evento</button>
+        </div>
+    </section>
+
+    <!-- PANTALLA DE AJUSTES Y CUENTA CLOUD -->
+    <section id="screen-settings" class="screen">
+        <div class="card">
+            <div class="section-title">
+                <span>☁️ Cuenta y Auto-Recuperación en la Nube</span>
+                <button class="icon-btn" onclick="switchTab('dashboard')">✕</button>
+            </div>
+
+            <div id="settings-auth-box" style="background:var(--bg-input); padding:12px; border-radius:12px; margin-bottom:10px;">
+                <div id="settings-user-email" style="font-weight:700; font-size:0.9rem; margin-bottom:4px;">Modo Local (Sin cuenta vinculada)</div>
+                <div id="settings-vault-desc" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">
+                    Inicia sesión con tu correo o Google para respaldar tus datos en tu bóveda privada y recuperarlos si cambias de móvil o limpias la caché.
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="btn-settings-login" class="btn-primary" style="flex:1;" onclick="openAuthModal()">🔐 Iniciar Sesión / Vincular Correo</button>
+                    <button id="btn-settings-restore" class="btn-secondary" onclick="forceManualCloudRestore()">🔄 Restaurar Ahora</button>
+                    <button id="btn-settings-logout" class="btn-secondary" style="display:none; color:#f87171;" onclick="logoutCloudAccount()">Salir</button>
+                </div>
+            </div>
+
+            <div style="font-size:0.78rem; color:var(--text-muted); display:flex; justify-content:space-between;">
+                <span>Almacenamiento: <b id="db-protection-status">Verificando...</b></span>
+                <span>Notificaciones: <b id="notif-status">Verificando...</b></span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title"><span>📍 Ubicaciones Inteligentes (Geofencing)</span></div>
+            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div id="lbl-setting-cochera" style="font-weight:700; font-size:0.86rem;">Mi Trabajo / Central</div>
+                    <div id="cochera-status" style="font-size:0.76rem; color:var(--text-muted);">Sin definir</div>
+                </div>
+                <button class="btn-secondary" onclick="openMapPicker('central')">🗺️ Fijar</button>
+            </div>
+            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:700; font-size:0.86rem;">🏠 Mi Casa</div>
+                    <div id="casa-status" style="font-size:0.76rem; color:var(--text-muted);">Sin definir</div>
+                </div>
+                <button class="btn-secondary" onclick="openMapPicker('casa')">🗺️ Fijar</button>
+            </div>
+            <div class="form-group" style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div id="lbl-setting-punto-a" style="font-weight:700; font-size:0.86rem;">📍 Mi Punto A</div>
+                    <div id="punto-a-status" style="font-size:0.76rem; color:var(--text-muted);">Sin definir</div>
+                </div>
+                <button class="btn-secondary" onclick="openMapPicker('punto_a')">🗺️ Fijar</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div id="lbl-setting-punto-b" style="font-weight:700; font-size:0.86rem;">📍 Mi Punto B</div>
+                    <div id="punto-b-status" style="font-size:0.76rem; color:var(--text-muted);">Sin definir</div>
+                </div>
+                <button class="btn-secondary" onclick="openMapPicker('punto_b')">🗺️ Fijar</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title"><span>🎨 Apariencia y Sonido</span></div>
+            <div class="theme-grid" style="margin-bottom:12px;">
+                <button class="theme-card-btn" data-theme="cafe" onclick="setTheme('cafe', this)">☕ Café</button>
+                <button class="theme-card-btn" data-theme="gris" onclick="setTheme('gris', this)">🌑 Gris</button>
+                <button class="theme-card-btn" data-theme="marino" onclick="setTheme('marino', this)">🌊 Marino</button>
+                <button class="theme-card-btn" data-theme="menta" onclick="setTheme('menta', this)">🌿 Menta</button>
+                <button class="theme-card-btn" data-theme="cream" onclick="setTheme('cream', this)">☀️ Claro</button>
+            </div>
+
+            <div class="form-group">
+                <label>Tono de Alarma</label>
+                <select id="sound-type-select" class="form-control" onchange="updateSoundType(this.value)">
+                    <option value="classic">🔔 Clásico Digital</option>
+                    <option value="harmonic">🎵 Armónico Suave</option>
+                    <option value="double">📢 Doble Aviso Fuerte</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Efecto Cristal (Glassmorphism)</label>
+                <select id="glass-effect-select" class="form-control" onchange="toggleGlassMode(this.value)">
+                    <option value="off">Desactivado</option>
+                    <option value="on">Activado</option>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                <span id="settings-profile-label" style="font-size:0.8rem; color:var(--text-muted);">Perfil Actual</span>
+                <button class="btn-secondary" onclick="openWelcomeScreen()">Cambiar Perfil</button>
+            </div>
+        </div>
+
+        <div class="card" style="text-align:center;">
+            <div id="version-tag" style="font-size:0.8rem; font-weight:700; margin-bottom:8px;">TaskMaster Calendar Pro_v 3.7.0</div>
+            <div style="display:flex; gap:8px; justify-content:center;">
+                <button class="btn-secondary" onclick="openContributionLink('revolut')">💙 Revolut</button>
+                <button class="btn-secondary" onclick="openContributionLink('paypal')">💛 PayPal</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- MODAL DE AUTENTICACIÓN (CORREO + GOOGLE) -->
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="section-title">
+                <span>🔐 Bóveda Privada en la Nube</span>
+                <button class="icon-btn" onclick="closeAuthModal()">✕</button>
+            </div>
+
+            <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;">
+                Vincula tu cuenta para sincronizar tus eventos, tareas, notas y puntos GPS en todos tus dispositivos y protegerlos ante cualquier borrado de caché.
+            </p>
+
+            <button class="btn-google" onclick="loginWithGoogle()">
+                <span>🔵</span> Continuar con Google
+            </button>
+
+            <div style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin:10px 0;">— o con tu correo electrónico —</div>
+
+            <div class="form-group">
+                <label>Correo electrónico</label>
+                <input type="email" id="authEmailInput" class="form-control" placeholder="tu@correo.com">
+            </div>
+
+            <div class="form-group">
+                <label>Contraseña (mínimo 6 caracteres)</label>
+                <input type="password" id="authPassInput" class="form-control" placeholder="••••••••">
+            </div>
+
+            <div id="auth-error-msg" style="display:none; color:#f87171; font-size:0.8rem; margin-bottom:10px;"></div>
+
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <button class="btn-primary" style="flex:1;" onclick="loginWithEmail()">Entrar</button>
+                <button class="btn-secondary" style="flex:1;" onclick="registerWithEmail()">Crear Cuenta</button>
+            </div>
+
+            <button class="btn-secondary" style="width:100%; font-size:0.78rem;" onclick="resetPasswordEmail()">
+                🔑 Olvidé mi contraseña (enviar correo de recuperación)
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL NUEVA TAREA -->
+    <div id="task-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="section-title">
+                <span>➕ Nueva Tarea</span>
+                <button class="icon-btn" onclick="closeTaskModal()">✕</button>
+            </div>
+
+            <div class="form-group">
+                <label>¿Qué tienes que hacer?</label>
+                <textarea id="taskInputText" class="form-control" rows="2" oninput="autoExpandTextarea(this)" placeholder="Ej. Llamar a mi hija / Revisar informe"></textarea>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div class="form-group">
+                    <label>Categoría</label>
+                    <select id="taskCategorySelect" class="form-control">
+                        <option value="personal">🏠 Personal</option>
+                        <option value="trabajo">💼 Trabajo</option>
+                        <option value="salud">💪 Salud</option>
+                        <option value="finanzas">💰 Finanzas</option>
+                        <option value="urgente">🚨 Urgente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Hora de Alarma</label>
+                    <input type="time" id="taskTimeInput" class="form-control">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div class="form-group">
+                    <label>Repetición</label>
+                    <select id="taskRepeatSelect" class="form-control">
+                        <option value="none">Una vez</option>
+                        <option value="daily">Diaria</option>
+                        <option value="weekly">Semanal</option>
+                        <option value="monthly">Mensual</option>
+                        <option value="15m">Cada 15 min</option>
+                        <option value="30m">Cada 30 min</option>
+                        <option value="1h">Cada 1 hora</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Aviso por Lugar (GPS)</label>
+                    <select id="taskLocSelect" class="form-control" onchange="handleLocSelectChange(this.value)">
+                        <option value="none">Sin ubicación</option>
+                        <option id="opt-loc-central" value="central">Mi Trabajo</option>
+                        <option value="casa">🏠 Mi Casa</option>
+                        <option id="opt-loc-punto-a" value="punto_a">📍 Mi Punto A</option>
+                        <option id="opt-loc-punto-b" value="punto_b">📍 Mi Punto B</option>
+                        <option value="super">🛒 Supermercado</option>
+                        <option value="gasolinera">⛽ Gasolinera</option>
+                        <option value="custom_map">🗺️ Elegir en mapa...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="event-custom-coord-status" style="display:none; font-size:0.78rem; color:var(--color-low); margin-bottom:8px;"></div>
+
+            <div class="form-group">
+                <label>Subtareas (separadas por coma)</label>
+                <input type="text" id="taskSubtasksInput" class="form-control" placeholder="Ej. Comprar pan, leche, fruta">
+            </div>
+
+            <button class="btn-primary" onclick="handleSaveTaskClick()">Guardar Tarea</button>
+        </div>
+    </div>
+
+    <!-- MODAL RECORDATORIO SIN HORA -->
+    <div id="reminder-prompt-modal" class="modal-overlay">
+        <div class="modal-box" style="text-align:center;">
+            <div style="font-size:2rem; margin-bottom:6px;">⏰</div>
+            <h3 style="margin-bottom:6px;">¿Quieres ponerle hora de alarma?</h3>
+            <p style="font-size:0.84rem; color:var(--text-muted); margin-bottom:14px;">Así recibirás un aviso sonoro cuando llegue el momento.</p>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-primary" style="flex:1;" onclick="promptAddReminderTime()">Sí, elegir hora</button>
+                <button class="btn-secondary" style="flex:1;" onclick="promptSaveWithoutReminder()">No, guardar así</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DIARIO & MOOD -->
+    <div id="journal-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="section-title">
+                <span>📖 Diario & Estado de Ánimo</span>
+                <button class="icon-btn" onclick="closeJournalModal()">✕</button>
+            </div>
+            <div class="mood-grid">
+                <button class="mood-btn" onclick="setJournalMood('🌟', this)">🌟</button>
+                <button class="mood-btn selected" onclick="setJournalMood('😊', this)">😊</button>
+                <button class="mood-btn" onclick="setJournalMood('🧘', this)">🧘</button>
+                <button class="mood-btn" onclick="setJournalMood('🎯', this)">🎯</button>
+                <button class="mood-btn" onclick="setJournalMood('☕', this)">☕</button>
+                <button class="mood-btn" onclick="setJournalMood('🥱', this)">🥱</button>
+                <button class="mood-btn" onclick="setJournalMood('🤯', this)">🤯</button>
+                <button class="mood-btn" onclick="setJournalMood('😔', this)">😔</button>
+            </div>
+            <div id="journal-mood-tip-box" style="display:none; background:var(--bg-input); padding:10px; border-radius:10px; font-size:0.82rem; margin-bottom:10px;"></div>
+            <div class="form-group">
+                <label>Tu lema o reflexión del día</label>
+                <textarea id="journalInputText" class="form-control" rows="3" placeholder="¿Cómo ha ido tu día o qué te motiva hoy?"></textarea>
+            </div>
+            <button class="btn-primary" onclick="saveJournalEntry()">Guardar en Diario</button>
+        </div>
+    </div>
+
+    <!-- MODAL LISTA DE COMPRAS / WISHLIST -->
+    <div id="wishlist-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="section-title">
+                <span>🛒 Compras y Deseos</span>
+                <button class="icon-btn" onclick="closeWishlistModal()">✕</button>
+            </div>
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <input type="text" id="wishItemName" class="form-control" style="flex:2;" placeholder="Artículo...">
+                <input type="number" id="wishItemPrice" class="form-control" style="flex:1;" placeholder="€" step="0.01">
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <button class="btn-secondary" style="flex:1;" onclick="addWishlistItem('shop')">+ Compra</button>
+                <button class="btn-secondary" style="flex:1;" onclick="addWishlistItem('wish')">+ Deseo 🎁</button>
+            </div>
+            <div id="shoppingListContainer" style="max-height:240px; overflow-y:auto; margin-bottom:10px;"></div>
+            <div id="shoppingTotalTxt" style="font-weight:800; text-align:right; color:var(--accent);">Total Estimado: 0.00 €</div>
+        </div>
+    </div>
+
+    <!-- MODAL MAPA LEAFLET -->
+    <div id="map-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="section-title">
+                <span>🗺️ Seleccionar Ubicación Exacta</span>
+                <button class="icon-btn" onclick="closeMapPicker()">✕</button>
+            </div>
+            <div id="map" style="height:280px; border-radius:12px; margin-bottom:10px;"></div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-secondary" style="flex:1;" onclick="centerMapOnUserGPS()">📍 Mi GPS</button>
+                <button class="btn-primary" style="flex:1;" onclick="confirmMapLocation()">Confirmar Punto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TUTORIAL / BIENVENIDA -->
+    <div id="tutorial-modal" class="modal-overlay">
+        <div class="modal-box" style="text-align:center;">
+            <div id="tut-icon" style="font-size:2.8rem; margin-bottom:8px;">🎭</div>
+            <h3 id="tut-title" style="margin-bottom:8px;">Título</h3>
+            <p id="tut-desc" style="font-size:0.88rem; color:var(--text-muted); line-height:1.45; margin-bottom:16px;">Descripción</p>
+            <div id="tut-counter" style="font-size:0.76rem; color:var(--text-muted); margin-bottom:12px;">1 / 4</div>
+            <div style="display:flex; gap:8px;">
+                <button id="tut-prev-btn" class="btn-secondary" style="flex:1;" onclick="moveTutorialStep(-1)">Anterior</button>
+                <button id="tut-next-btn" class="btn-primary" style="flex:1; background:#2e7d32;" onclick="moveTutorialStep(1)">¡Entendido!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTÓN FLOTANTE (+) PARA TAREAS -->
+    <button id="fab-main-btn" onclick="handleFabClick()">+</button>
+
+    <!-- SELLO OFICIAL DISIMULADO MEDBASHA -->
+    <footer class="medbasha-stamp">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <polygon points="12 2 21 7 21 17 12 22 3 17 3 7 12 2"></polygon>
+            <text x="12" y="14.5" text-anchor="middle" font-size="7.5" font-weight="bold" fill="currentColor" stroke="none">MB</text>
+        </svg>
+        <span>medbasha</span>
+    </footer>
+
+    <!-- BARRA DE NAVEGACIÓN INFERIOR -->
+    <nav class="bottom-nav">
+        <button id="nav-dashboard" class="nav-item active" onclick="switchTab('dashboard')">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-text">Inicio</span>
+        </button>
+        <button id="nav-calendar" class="nav-item" onclick="switchTab('calendar')">
+            <span class="nav-icon">📅</span>
+            <span class="nav-text">Calendario</span>
+        </button>
+        <button id="nav-tasks" class="nav-item" onclick="switchTab('tasks')">
+            <span class="nav-icon">✅</span>
+            <span class="nav-text">Tareas</span>
+        </button>
+        <button id="nav-notes" class="nav-item" onclick="switchTab('notes')">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text">Notas</span>
+        </button>
+        <button id="nav-summary" class="nav-item" onclick="switchTab('summary')">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text">Resumen</span>
+        </button>
+    </nav>
+
+    <script src="./app.js"></script>
+</body>
+</html>
